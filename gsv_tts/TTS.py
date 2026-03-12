@@ -62,9 +62,19 @@ class TTS:
         self.tts_config = Config()
         
         if not device is None:
-            assert device == "cpu" "CPU inference is not supported."
+            assert device in {"cpu", "cuda", "mps"}, "device must be one of: cpu, cuda, mps"
             self.tts_config.device = device
+            if device in {"cpu", "mps"}:
+                # Keep precision conservative on non-CUDA backends.
+                self.tts_config.is_half = False
+                self.tts_config.dtype = torch.float32
         if not is_half is None:
+            if is_half and "cuda" not in str(self.tts_config.device):
+                logging.warning(
+                    "is_half=True is only supported on CUDA; forcing float32 on %s.",
+                    self.tts_config.device,
+                )
+                is_half = False
             self.tts_config.is_half = is_half
             self.tts_config.dtype = torch.float16 if is_half else torch.float32
         
@@ -124,6 +134,7 @@ class TTS:
         top_p: float = 1.0,
         temperature: float = 1.0,
         repetition_penalty: float = 1.35,
+        min_output_tokens: int = 0,
         noise_scale: float = 0.5,
         speed: float = 1.0,
         gpt_model: str = None,
@@ -176,20 +187,20 @@ class TTS:
                 else:
                     sovits_model = self.default_sovits_path
 
-            logging.info(f"Using GPT model: {gpt_model}")
-            logging.info(f"Using SoVITS model: {sovits_model}")
+            logging.debug(f"Using GPT model: {gpt_model}")
+            logging.debug(f"Using SoVITS model: {sovits_model}")
 
             sovits, ge = self._prepare_sovits_resources(sovits_model, spk_audio_path)
             gpt, prompt, phones1, bert1 = self._prepare_gpt_resources(gpt_model, prompt_audio_path, prompt_audio_text)
             t2s_model = gpt.t2s_model
             vq_model = sovits.vq_model
 
-            logging.info("Processing text to phones and BERT features...")
+            logging.debug("Processing text to phones and BERT features...")
             phones2, word2ph, bert2, norm_text = get_phones_and_bert(text, self.tts_config)
             all_phoneme_ids = torch.LongTensor(phones1 + phones2).to(self.tts_config.device).unsqueeze(0)
             bert = torch.cat([bert1, bert2]).unsqueeze(0)
 
-            logging.info("Running GPT inference (Text-to-Semantic)...")
+            logging.debug("Running GPT inference (Text-to-Semantic)...")
             pred_semantic = t2s_model.infer(
                 all_phoneme_ids,
                 prompt,
@@ -198,9 +209,10 @@ class TTS:
                 top_p=top_p,
                 temperature=temperature,
                 repetition_penalty=repetition_penalty,
+                min_output_tokens=min_output_tokens,
             )
 
-            logging.info("Running SoVITS inference (Semantic-to-Waveform)...")
+            logging.debug("Running SoVITS inference (Semantic-to-Waveform)...")
             phones2_tensor = torch.LongTensor(phones2).to(self.tts_config.device).unsqueeze(0)
             encoded_text, text_mask = vq_model.enc_p.text_encode(phones2_tensor)
 
@@ -258,6 +270,7 @@ class TTS:
         top_p: float = 1.0,
         temperature: float = 1.0,
         repetition_penalty: float = 1.35,
+        min_output_tokens: int = 0,
         noise_scale: float = 0.5,
         speed: float = 1.0,
         gpt_model: str = None,
@@ -356,6 +369,7 @@ class TTS:
                     top_p=top_p,
                     temperature=temperature,
                     repetition_penalty=repetition_penalty,
+                    min_output_tokens=min_output_tokens,
                     stream_chunk=stream_chunk,
                     boost_first_chunk=boost_first_chunk if i == 0 else False,
                     debug=debug,
@@ -1243,7 +1257,7 @@ class TTS:
         silence = torch.zeros(int(16000 * 0.3), device=wav16k.device, dtype=wav16k.dtype)
         wav16k = torch.cat([wav16k, silence])
 
-        ssl_content = cnhubert_model.model(wav16k.unsqueeze(0))["last_hidden_state"].transpose(1, 2)
+        ssl_content = cnhubert_model(wav16k.unsqueeze(0)).transpose(1, 2).to(self.tts_config.dtype)
         codes = sovits_model.vq_model.extract_latent(ssl_content)
         prompt_semantic = codes[0, 0]
         prompt = prompt_semantic.unsqueeze(0).to(self.tts_config.device)

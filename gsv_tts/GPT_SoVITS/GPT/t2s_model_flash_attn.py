@@ -351,6 +351,7 @@ class Text2SemanticDecoder(nn.Module):
         top_p: int = 1.0,
         temperature: float = 1.0,
         repetition_penalty: float = 1.35,
+        min_output_tokens: int = 0,
     ):
         xy_pos, prompt_attn_mask = self.process_single_data(x, y, bert_feature)
 
@@ -392,7 +393,8 @@ class Text2SemanticDecoder(nn.Module):
 
             samples = sample(logits, pre_tokens, top_k=top_k, top_p=top_p, repetition_penalty=repetition_penalty, temperature=temperature)[0]
             
-            if samples[0, 0] == self.EOS:
+            # Prevent early EOS for very short utterances.
+            if samples[0, 0] == self.EOS and idx >= min_output_tokens:
                 break
 
             pre_tokens = torch.concat([pre_tokens, samples], dim=1)
@@ -412,6 +414,7 @@ class Text2SemanticDecoder(nn.Module):
         top_p: int = 1.0,
         temperature: float = 1.0,
         repetition_penalty: float = 1.35,
+        min_output_tokens: int = 0,
         stream_chunk: int = 25,
         boost_first_chunk: bool = True,
         debug: bool = True,
@@ -458,7 +461,8 @@ class Text2SemanticDecoder(nn.Module):
 
             samples = sample(logits, pre_tokens, top_k=top_k, top_p=top_p, repetition_penalty=repetition_penalty, temperature=temperature)[0]
             
-            if samples[0, 0] == self.EOS:
+            # Prevent early EOS for very short utterances.
+            if samples[0, 0] == self.EOS and idx >= min_output_tokens:
                 break
 
             pre_tokens = torch.concat([pre_tokens, samples], dim=1)

@@ -51,7 +51,7 @@ class T2SBlock(nn.Module):
 
         x = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
 
-        x = x.transpose(1, 2).view(B, L, self.hidden_dim)
+        x = x.transpose(1, 2).reshape(B, L, self.hidden_dim)
         x = self.out_proj(x)
         
         x = residual + x
@@ -91,7 +91,7 @@ class T2SBlock(nn.Module):
 
         x = F.scaled_dot_product_attention(q, k_cache, v_cache, attn_mask=attn_mask)
         
-        x = x.transpose(1, 2).view(B, L, self.hidden_dim)
+        x = x.transpose(1, 2).reshape(B, L, self.hidden_dim)
         x = self.out_proj(x)
         
         x = residual + x
@@ -220,6 +220,34 @@ class Text2SemanticDecoder(nn.Module):
                     self.cuda_graph_buckets[batch_size].append(max_kv_cache)
             else:
                 self.cuda_graph_buckets[batch_size] = [max_kv_cache]
+
+        # Non-CUDA backends (e.g., MPS/CPU): prepare KV caches only.
+        if "cuda" not in str(device):
+            for batch_size in self.cuda_graph_buckets:
+                for i in range(-1, -len(self.cuda_graph_buckets[batch_size]) - 1, -1):
+                    max_kv_cache = self.cuda_graph_buckets[batch_size][i]
+                    bucket = Bucket()
+                    bucket.max_kv_cache = max_kv_cache
+                    bucket.batch_size = batch_size
+                    bucket.k_cache = torch.zeros(
+                        (self.num_layers, batch_size, self.num_head, max_kv_cache, int(self.model_dim / self.num_head)),
+                        dtype=dtype,
+                        device=device,
+                    )
+                    bucket.v_cache = torch.zeros(
+                        (self.num_layers, batch_size, self.num_head, max_kv_cache, int(self.model_dim / self.num_head)),
+                        dtype=dtype,
+                        device=device,
+                    )
+                    bucket.decode_attn_mask = torch.zeros(
+                        (batch_size, self.num_head, 1, max_kv_cache), dtype=torch.bool, device=device
+                    )
+                    bucket.kv_cache_len = torch.zeros((batch_size,), dtype=torch.int64, device=device)
+                    bucket.graph_xy_pos = torch.zeros((batch_size, 1, self.model_dim), dtype=dtype, device=device)
+                    bucket.batch_indices = torch.arange(batch_size, dtype=torch.int64, device=device)
+                    bucket.cuda_graph = None
+                    self.cuda_graph_buckets[batch_size][i] = bucket
+            return
         
         s = torch.cuda.Stream()
         s.wait_stream(torch.cuda.current_stream())
@@ -362,6 +390,7 @@ class Text2SemanticDecoder(nn.Module):
         top_p: int = 1.0,
         temperature: float = 1.0,
         repetition_penalty: float = 1.35,
+        min_output_tokens: int = 0,
     ):
         xy_pos, prompt_attn_mask = self.process_single_data(x, y, bert_feature)
 
@@ -391,15 +420,20 @@ class Text2SemanticDecoder(nn.Module):
         max_bucket.decode_attn_mask.fill_(False)
         bucket.decode_attn_mask[:, :, :, :bucket.kv_cache_len] = True
         
-        for idx in tqdm(range(1, max_bucket.max_kv_cache - bucket.kv_cache_len + 1)):
+        for idx in range(1, max_bucket.max_kv_cache - bucket.kv_cache_len + 1):
             if bucket.kv_cache_len == bucket.max_kv_cache:
                 bucket_i += 1
                 bucket: Bucket = buckets[bucket_i]
 
             bucket.decode_attn_mask[:, :, :, bucket.kv_cache_len] = True
             bucket.graph_xy_pos.copy_(xy_pos)
-            bucket.cuda_graph.replay()
-            xy_dec = bucket.graph_xy_dec.clone()
+            if bucket.cuda_graph is not None:
+                bucket.cuda_graph.replay()
+                xy_dec = bucket.graph_xy_dec.clone()
+            else:
+                xy_dec = self.t2s_transformer.decode_next_token(
+                    bucket.graph_xy_pos, bucket.k_cache, bucket.v_cache, bucket.kv_cache_len, bucket.decode_attn_mask, bucket.batch_indices
+                )
 
             # xy_dec = self.t2s_transformer.decode_next_token(xy_pos, bucket.k_cache, bucket.v_cache, bucket.kv_cache_len)
 
@@ -407,7 +441,8 @@ class Text2SemanticDecoder(nn.Module):
 
             samples = sample(logits, pre_tokens, top_k=top_k, top_p=top_p, repetition_penalty=repetition_penalty, temperature=temperature)[0]
             
-            if samples[0, 0] == self.EOS:
+            # Prevent early EOS for very short utterances.
+            if samples[0, 0] == self.EOS and idx >= min_output_tokens:
                 break
 
             pre_tokens = torch.concat([pre_tokens, samples], dim=1)
@@ -427,6 +462,7 @@ class Text2SemanticDecoder(nn.Module):
         top_p: int = 1.0,
         temperature: float = 1.0,
         repetition_penalty: float = 1.35,
+        min_output_tokens: int = 0,
         stream_chunk: int = 25,
         boost_first_chunk: bool = True,
         debug: bool = True,
@@ -468,8 +504,13 @@ class Text2SemanticDecoder(nn.Module):
             
             bucket.decode_attn_mask[:, :, :, bucket.kv_cache_len] = True
             bucket.graph_xy_pos.copy_(xy_pos)
-            bucket.cuda_graph.replay()
-            xy_dec = bucket.graph_xy_dec.clone()
+            if bucket.cuda_graph is not None:
+                bucket.cuda_graph.replay()
+                xy_dec = bucket.graph_xy_dec.clone()
+            else:
+                xy_dec = self.t2s_transformer.decode_next_token(
+                    bucket.graph_xy_pos, bucket.k_cache, bucket.v_cache, bucket.kv_cache_len, bucket.decode_attn_mask, bucket.batch_indices
+                )
 
             # xy_dec = self.t2s_transformer.decode_next_token(xy_pos, bucket.k_cache, bucket.v_cache, bucket.kv_cache_len)
 
@@ -477,7 +518,8 @@ class Text2SemanticDecoder(nn.Module):
 
             samples = sample(logits, pre_tokens, top_k=top_k, top_p=top_p, repetition_penalty=repetition_penalty, temperature=temperature)[0]
             
-            if samples[0, 0] == self.EOS:
+            # Prevent early EOS for very short utterances.
+            if samples[0, 0] == self.EOS and idx >= min_output_tokens:
                 break
 
             pre_tokens = torch.concat([pre_tokens, samples], dim=1)
@@ -578,13 +620,18 @@ class Text2SemanticDecoder(nn.Module):
         ignore_batch = torch.ones(batch_size, dtype=torch.bool, device=device)
         ignore_batch[:actual_batch_size] = False
         while True:
-            for idx in tqdm(range(1000)):
+            for idx in range(1000):
                 decode_steps += 1
 
                 bucket.decode_attn_mask[batch_indices, :, :, bucket.kv_cache_len] = True
                 bucket.graph_xy_pos.copy_(xy_pos)
-                bucket.cuda_graph.replay()
-                xy_dec = bucket.graph_xy_dec.clone()
+                if bucket.cuda_graph is not None:
+                    bucket.cuda_graph.replay()
+                    xy_dec = bucket.graph_xy_dec.clone()
+                else:
+                    xy_dec = self.t2s_transformer.decode_next_token(
+                        bucket.graph_xy_pos, bucket.k_cache, bucket.v_cache, bucket.kv_cache_len, bucket.decode_attn_mask, bucket.batch_indices
+                    )
 
                 # xy_dec = self.t2s_transformer.decode_next_token(xy_pos, bucket.k_cache, bucket.v_cache, bucket.kv_cache_len)
 

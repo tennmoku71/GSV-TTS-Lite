@@ -1,0 +1,15 @@
+output/
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.DS_Store
+build/
+onnx_export/
+onnx_export_full/
+onnx_export_full_static/
+nuitka-crash-report.xml
+models/
+examples/*
+!examples/AnAn.ogg
+!examples/laffey.mp3

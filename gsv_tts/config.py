@@ -32,30 +32,36 @@ def get_device_info(idx: int):
 
     return None
 
-if not torch.cuda.is_available():
-    raise RuntimeError(
-        "NVIDIA CUDA environment not detected. This application requires an NVIDIA GPU to run. "
-        "Please check your graphics drivers and CUDA installation."
-    )
+infer_device = None
+is_half = False
 
-GPU_COUNT = torch.cuda.device_count()
-available_devices = []
+if torch.cuda.is_available():
+    GPU_COUNT = torch.cuda.device_count()
+    available_devices = []
 
-for i in range(GPU_COUNT):
-    info = get_device_info(i)
-    if info is not None:
-        available_devices.append(info)
+    for i in range(GPU_COUNT):
+        info = get_device_info(i)
+        if info is not None:
+            available_devices.append(info)
 
-if available_devices:
-    best_info = max(available_devices, key=lambda x: (x[2], x[3]))
-    infer_device = best_info[0]
-    is_half = any(dtype == torch.float16 for _, dtype, _, _ in available_devices)
+    if available_devices:
+        best_info = max(available_devices, key=lambda x: (x[2], x[3]))
+        infer_device = best_info[0]
+        is_half = any(dtype == torch.float16 for _, dtype, _, _ in available_devices)
+    else:
+        raise RuntimeError(
+            "No compatible NVIDIA GPU found!\n"
+            "Compute Capability: 5.3 or higher (Maxwell architecture and above).\n"
+            "Please verify your hardware specifications."
+        )
+elif torch.backends.mps.is_available():
+    # MPS currently works more reliably in float32.
+    infer_device = torch.device("mps")
+    is_half = False
 else:
-    RuntimeError(
-        "No compatible NVIDIA GPU found!\n"
-        "Compute Capability: 5.3 or higher (Maxwell architecture and above).\n"
-        "Please verify your hardware specifications."
-    )
+    # Last-priority fallback for environments without CUDA/MPS.
+    infer_device = torch.device("cpu")
+    is_half = False
 
 
 class Config:

@@ -2,6 +2,7 @@ import os
 import json
 import torch
 import hashlib
+import logging
 from io import BytesIO
 from safetensors.torch import load_model
 
@@ -86,7 +87,8 @@ def get_sovits_weights(sovits_path, tts_config: Config):
             vq_model = vq_model.to(tts_config.device)
 
     vq_model.eval()
-    vq_model.warmup(tts_config.dtype, tts_config.device, tts_config.sovits_cache)
+    if "cuda" in str(tts_config.device):
+        vq_model.warmup(tts_config.dtype, tts_config.device, tts_config.sovits_cache)
 
     sovits = Sovits(vq_model, hps)
 
@@ -99,12 +101,19 @@ class Gpt:
         self.config = config
 
 def get_gpt_weights(gpt_path, tts_config: Config):
+    use_flash_attn = tts_config.use_flash_attn and "cuda" in str(tts_config.device)
+    if tts_config.use_flash_attn and not use_flash_attn:
+        logging.warning(
+            "use_flash_attn=True is ignored on non-CUDA device (%s); falling back to standard attention.",
+            tts_config.device,
+        )
+
     if os.path.isdir(gpt_path):
         with open(os.path.join(gpt_path, "config.json"), "r") as f:
             config = json.load(f)
 
         with torch.device("meta"):
-            if tts_config.use_flash_attn:
+            if use_flash_attn:
                 from .GPT_SoVITS.GPT.t2s_model_flash_attn import Text2SemanticDecoder as Text2SemanticDecoder_flash_attn
                 t2s_model = Text2SemanticDecoder_flash_attn(config)
             else:
@@ -145,7 +154,7 @@ def get_gpt_weights(gpt_path, tts_config: Config):
             for k, v in dict_s1["weight"].items()
         }
 
-        if tts_config.use_flash_attn:
+        if use_flash_attn:
             from .GPT_SoVITS.GPT.t2s_model_flash_attn import Text2SemanticDecoder as Text2SemanticDecoder_flash_attn
             t2s_model = Text2SemanticDecoder_flash_attn(config)
         else:

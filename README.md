@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="项目主页链接">
+  <a href="https://github.com/chinokikiss/GSV-TTS-Lite">
     <img src="huiyeji.gif" alt="Logo" width="240" height="254">
   </a>
 
@@ -22,12 +22,8 @@
   </p>
 
   <p>
-    <a href="README_EN.md">
-      <img src="https://img.shields.io/badge/English-66ccff?style=flat-square&logo=github&logoColor=white" alt="English">
-    </a>
-    &nbsp;
     <a href="README.md">
-      <img src="https://img.shields.io/badge/简体中文-ff99cc?style=flat-square&logo=github&logoColor=white" alt="Chinese">
+      <img src="https://img.shields.io/badge/English-66ccff?style=flat-square&logo=github&logoColor=white" alt="English">
     </a>
   </p>
 </div>
@@ -36,90 +32,84 @@
   <img src="https://user-images.githubusercontent.com/73097560/115834477-dbab4500-a447-11eb-908a-139a6edaec5c.gif">
 </div>
 
-## 关于项目 (About)
+## Fork Notes
 
-本项目诞生的初衷源于对极致性能的追求。我在原版 GPT-SoVITS 的使用过程中，受限于 RTX 3050 (Laptop) 的算力瓶颈，推理延迟往往难以满足实时交互的需求。
+- Upstream project: https://github.com/chinokikiss/GSV-TTS-Lite
+- This repository is a derivative focused on improving buildability and distributability.
+- The main change in this iteration is enabling a practical build pipeline and adding macOS support (including Apple Silicon / MPS paths) so the package can be distributed and run directly.
+- Other than build/platform compatibility updates, runtime inference behavior is kept as close to upstream as possible.
 
-为了打破这一限制，**GSV-TTS-Lite** 应运而生，它是基于 **GPT-SoVITS V2Pro** 开发的推理后端。通过一些深度优化技术，本项目成功在低显存环境下实现了毫秒级的实时响应。
+## Language Policy
 
-除了性能上的飞跃，**GSV-TTS-Lite** 还实现了**音色与风格的解耦**，支持独立控制说话人的音色与情感，并加入了**字幕时间戳对齐**与**音色迁移**等特色功能。
+- English is the primary language for documentation, issues, and pull requests in this fork.
+- Non-English notes may be added when needed, but English content is treated as the source of truth.
 
-为了便于开发者集成，**GSV-TTS-Lite** 大幅精简了代码架构，并已作为 `gsv-tts-lite` 库发布至 PyPI，支持通过 `pip` 一键安装。
+## About
 
-目前支持的语言有 **中日英**，支持的模型有 **V2Pro**、**V2ProPlus**。
-## 性能对比 (Performance)
+The original motivation for this project was the pursuit of ultimate performance. While using the original GPT-SoVITS, I found that the inference latency often struggled to meet the demands of real-time interaction due to the computing power bottlenecks of the RTX 3050 (Laptop).
+
+To break through these limitations, **GSV-TTS-Lite** was developed as an inference backend based on **GPT-SoVITS V2Pro**. Through deep optimization techniques, this project successfully achieves millisecond-level real-time response in low-VRAM environments.
+
+Beyond the leap in performance, **GSV-TTS-Lite** implements the **decoupling of timbre and style**, supporting independent control over the speaker's voice and emotion. It also features **subtitle timestamp alignment** and **voice conversion (timbre transfer)**.
+
+To facilitate integration for developers, **GSV-TTS-Lite** features a significantly streamlined code architecture and is available on PyPI as the `gsv-tts-lite` library, supporting one-click installation via `pip`.
+
+The currently supported languages are **Chinese, Japanese, and English**. The available models include **v2pro and v2proplus**.
+## Performance Comparison
 
 > [!NOTE]
-> **测试环境**：NVIDIA GeForce RTX 3050 (Laptop)
+> **Test Environment**: NVIDIA GeForce RTX 3050 (Laptop)
 
-| 推理后端 (Backend)| 设置 (Settings) | 首包延迟 (TTFT) | 实时率 (RTF) | 显存 (VRAM) | 提升幅度 |
+| Backend | Settings | TTFT (First Packet) | RTF (Real-time Factor) | VRAM | Speedup |
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | **Original** | `streaming_mode=3` | 436 ms | 0.381 | 1.6 GB | - |
 | **Lite Version** | `Flash_Attn=Off` | 150 ms | 0.125 | **0.8 GB** | ⚡ **2.9x** Speed |
 | **Lite Version** | `Flash_Attn=On` | **133 ms** | **0.108** | **0.8 GB** | 🔥 **3.3x** Speed |
 
-可以看到，**GSV-TTS-Lite** 实现了 **3x ~ 4x** 速度提升，且显存占用 **减半**！🚀
+As shown, **GSV-TTS-Lite** achieves **3x ~ 4x** speed improvements while **halving** the VRAM usage! 🚀
 <br>
 
-## 整合包下载 (One-click Download)
+## Deployment (For Developers)
 
-> [!TIP]
-> 如果你是小白，想要快速体验，可以直接下载预配置好的整合包。
-
-- **硬件要求**：
-  - **操作系统**：仅限 Windows。
-  - **显卡需求**：NVIDIA 显卡，显存需 **4GB** 及以上。
-  - **显存说明**：默认集成了 `Qwen3-ASR` 模型。若显存不足，可在 `go-webui.bat` 中通过参数禁用 ASR 模块以节省空间。
-- **下载地址**：
-  - [推荐版](https://modelscope.cn/models/chinokiki/GPTSoVITS-RT/resolve/master/gsv-tts-lite-web-cu128.zip)
-  - [通用版(兼容旧款 NVIDIA 显卡)](https://modelscope.cn/models/chinokiki/GPTSoVITS-RT/resolve/master/gsv-tts-lite-web-cu118.zip)
-- **使用说明**：
-  1. 下载并解压压缩包（建议路径不要包含中文）。
-  2. 双击运行 `go-webui.bat` 等待网页推理界面跳出。
-  3. 然后就可以开始体验语音合成了！
-  4. 注意！风格参考和音色参考两个都需要上传，少一个都会合成失败！
-
-## 开发者部署 (Deployment)
-
-### 环境准备
+### Prerequisites
 
 - **CUDA Toolkit**
 - **Microsoft Visual C++**
 
-### 安装部署
+### Installation Steps
 
-#### 1. 环境配置
-建议使用 Python>=3.10 创建虚拟环境。
+#### 1. Environment Configuration
+It is recommended to create a virtual environment using Python >=3.10.
 ```bash
-# 安装 PyTorch
+# Install PyTorch
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 ```
-#### 2. 安装 GSV-TTS-Lite
-若已准备好上述基础环境，可直接执行以下命令完成集成：
+#### 2.	Install GSV-TTS-Lite
+If you have prepared the above basic environment, you can directly execute the following command to complete the integration:
 ```bash
 pip install gsv-tts-lite==0.2.7 --prefer-binary
 ```
 
-### 快速使用
+### Quick Start
 
 > [!TIP]
-> 首次运行时，程序会自动下载所需的预训练模型。
+> The program will automatically download the required pre-trained models upon the first run.
 
-#### 1. 基础推理
+#### 1. Basic Inference
 ```python
 from gsv_tts import TTS
 
 tts = TTS()
-# tts = TTS(use_bert=True) 如果要获得更优的中文合成效果，建议这样设置
-# tts = TTS(use_flash_attn=True) 如果安装了Flash Attention，建议这样设置
+# tts = TTS(use_bert=True) # Recommended setting for better Chinese synthesis results.
+# tts = TTS(use_flash_attn=True) # Recommended setting if Flash Attention is installed.
 
-# 将 GPT 模型权重从指定路径加载到内存中，这里加载默认模型。
+# Load GPT model weights from the specified path into memory; loads the default model here.
 tts.load_gpt_model()
 
-# 将 SoVITS 模型权重从指定路径加载到内存中，这里加载默认模型。
+# Load SoVITS model weights from the specified path into memory; loads the default model here.
 tts.load_sovits_model()
 
-# 预加载与缓存资源，可显著减少首次推理的延迟
+# Pre-load and cache resources to significantly reduce latency during the first inference.
 # tts.init_language_module("ja")
 # tts.cache_spk_audio("examples\laffey.mp3")
 # tts.cache_prompt_audio(
@@ -127,22 +117,22 @@ tts.load_sovits_model()
 #     prompt_audio_texts="ちが……ちがう。レイア、貴様は間違っている。",
 # )
 
-# infer 是最简单、最原始的推理方式，适用于短文本推理。
+# 'infer' is the simplest and most basic inference method, suitable for short text generation.
 audio = tts.infer(
-    spk_audio_path="examples\laffey.mp3", # 音色参考音频
-    prompt_audio_path="examples\AnAn.ogg", # 风格参考音频
-    prompt_audio_text="ちが……ちがう。レイア、貴様は間違っている。", # 风格参考音频对应的文本
-    text="へぇー、ここまでしてくれるんですね。", # 目标生成文本
-    # gpt_model = None, # 用于推理的GPT模型路径，默认用第一个加载的GPT模型推理
-    # sovits_model = None, # 用于推理的SoVITS模型路径，默认用第一个加载的SoVITS模型推理
+    spk_audio_path="examples\laffey.mp3", # Voice reference audio (Timbre)
+    prompt_audio_path="examples\AnAn.ogg", # Style reference audio (Prompt)
+    prompt_audio_text="ちが……ちがう。レイア、貴様は間違っている。", # The corresponding text for the style reference audio
+    text="へぇー、ここまでしてくれるんですね。", # Target text to be generated
+    # gpt_model = None, # Path to the GPT model for inference; defaults to the first loaded GPT model.
+    # sovits_model = None, # Path to the SoVITS model for inference; defaults to the first loaded SoVITS model.
 )
 
 audio.play()
 tts.audio_queue.wait()
-# tts.audio_queue.stop() 停止播放
+# tts.audio_queue.stop() # Stop playback
 ```
 
-#### 2. 流式推理 / 字幕同步
+#### 2. Stream Inference / Subtitle Synchronization
 ```python
 import time
 import queue
@@ -186,10 +176,10 @@ class SubtitlesQueue:
 
 tts = TTS()
 
-# infer、infer_stream、infer_batched、infer_vc 其实都支持字幕时间戳的返回，这里只是通过 infer_stream 举个例子
+# infer, infer_stream, and infer_batched all support returning subtitle timestamps; infer_stream is used here just as an example.
 subtitlesqueue = SubtitlesQueue()
 
-# infer_stream 实现了 Token 级别的流式输出，显著降低了首字延迟，能够实现极低延迟的实时反馈体验。
+# infer_stream implements token-level streaming output, significantly reducing first-token latency and enabling a ultra-low latency real-time feedback experience.
 generator = tts.infer_stream(
     spk_audio_path="examples\laffey.mp3",
     prompt_audio_path="examples\AnAn.ogg",
@@ -204,15 +194,16 @@ for audio in generator:
 
 tts.audio_queue.wait()
 subtitlesqueue.add(None, None)
+print()
 ```
 
-#### 3. 批量推理
+#### 3. Batched Inference
 ```python
 from gsv_tts import TTS
 
 tts = TTS()
 
-# infer_batched 专为长文本及多句合成场景优化。该模式不仅在处理效率上具有显著优势，更支持在同一批次（Batch）中为不同句子指定不同的参考音频，提供了极高的合成自由度与灵活性。
+# infer_batched is optimized specifically for long-form text and multi-sentence synthesis scenarios. This mode not only offers significant advantages in processing efficiency but also supports assigning different reference audios to different sentences within the same batch, providing high synthesis freedom and flexibility.
 audios = tts.infer_batched(
     spk_audio_paths="examples\laffey.mp3",
     prompt_audio_paths="examples\AnAn.ogg",
@@ -224,13 +215,13 @@ for i, audio in enumerate(audios):
     audio.save(f"audio{i}.wav")
 ```
 
-#### 4. 音色迁移
+#### 4. Voice Conversion
 ```python
 from gsv_tts import TTS
 
-tts = TTS(always_load_cnhubert=True)
+tts = TTS()
 
-# infer_vc 虽然支持 Few-shot（少样本）音色迁移，在便捷性上有一定优势，但在转换质量上，相较于 RVC、SVC 等专门的变声模型仍有提升空间。
+# Although infer_vc supports few-shot voice conversion and offers convenience, its conversion quality still has room for improvement compared to specialized voice conversion models like RVC or SVC.
 audio = tts.infer_vc(
     spk_audio_path="examples\laffey.mp3",
     prompt_audio_path="examples\AnAn.ogg",
@@ -241,71 +232,156 @@ audio.play()
 tts.audio_queue.wait()
 ```
 
-#### 5. 声纹识别
+#### 5. Speaker Verification
 ```python
 from gsv_tts import TTS
 
 tts = TTS(always_load_sv=True)
 
-# verify_speaker 用于对比两段音频的说话人特征，判断其是否为同一人。
+# verify_speaker is used to compare the speaker characteristics of two audio clips to determine if they are the same person.
 similarity = tts.verify_speaker("examples\laffey.mp3", "examples\AnAn.ogg")
-print("声纹相似度：", similarity)
+print("Speaker Similarity:", similarity)
 ```
 
 <details>
-<summary><strong>6. 其他函数接口</strong></summary>
+<summary><strong>6. Other Function Interfaces</strong></summary>
 
-### 1. 模型管理
+### 1. Model Management
 
 #### `init_language_module(languages)`
-预加载必要的语言处理模块。
+Preload necessary language processing modules.
 
 #### `load_gpt_model(model_paths)`
-将 GPT 模型权重从指定路径加载到内存中。
+Load GPT model weights from specified paths into memory.
 
 #### `load_sovits_model(model_paths)`
-将 SoVITS 模型权重从指定路径加载到内存中。
+Load SoVITS model weights from specified paths into memory.
 
 #### `unload_gpt_model(model_paths)` / `unload_sovits_model(model_paths)`
-从内存中卸载模型以释放资源。
+Unload models from memory to free up resources.
 
 #### `get_gpt_list()` / `get_sovits_list()`
-获取当前已加载模型的列表。
+Get the list of currently loaded models.
 
 #### `to_safetensors(checkpoint_path)`
-将 PyTorch 格式的模型权重文件（.pth 或 .ckpt）转换为 safetensors 格式。
+Converts PyTorch checkpoint files (.pth or .ckpt) into the safetensors format.
 
-### 2. 音频缓存管理
+### 2. Audio Cache Management
 
 #### `cache_spk_audio(spk_audio_paths)`
-预处理并缓存音色参考音频数据。
+Preprocess and cache speaker reference audio data.
 
 #### `cache_prompt_audio(prompt_audio_paths, prompt_audio_texts, prompt_audio_languages)`
-预处理并缓存风格参考音频数据。
+Preprocess and cache prompt reference audio data.
 
-#### `del_spk_audio(spk_audio_paths)` / `del_prompt_audio(prompt_audio_paths)`
-从缓存中移除音频数据。
+#### `del_spk_audio(spk_audio_list)` / `del_prompt_audio(prompt_audio_paths)`
+Remove audio data from the cache.
 
 #### `get_spk_audio_list()` / `get_prompt_audio_list()`
-获取缓存中的音频数据列表。
+Get the list of audio data in the cache.
 
 </details>
 
+## HTTP Server
+
+`gsv_tts_http_server.py` provides TTS over HTTP.
+
+### Prerequisites
+
+- Python 3.11+
+- Installed dependencies from `requirements.txt`
+- Model directory (default): `~/.cache/gsv` with `s1v3/`, `s2Gv2ProPlus/`, `chinese-hubert-base/`, and `g2p/`
+
+### Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Start Server
+
+```bash
+.venv/bin/python gsv_tts_http_server.py \
+  --host 127.0.0.1 \
+  --port 9882 \
+  --models-dir /Users/<your-user>/.cache/gsv
+```
+
+Expected logs:
+
+- `server started: http://127.0.0.1:9882`
+- `endpoints: GET /health, POST /synthesize`
+
+Startup warmup runs once by default. Disable it with:
+
+```bash
+.venv/bin/python gsv_tts_http_server.py \
+  --host 127.0.0.1 \
+  --port 9882 \
+  --models-dir /Users/<your-user>/.cache/gsv \
+  --warmup-text ""
+```
+
+### Endpoints
+
+- `GET /health`
+- `POST /synthesize`
+
+Minimal request:
+
+```bash
+curl -s -X POST "http://127.0.0.1:9882/synthesize" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Hello from HTTP server."
+  }'
+```
+
+Optional `POST /synthesize` fields:
+
+- `spk_audio_path`
+- `prompt_audio_path`
+- `prompt_audio_text`
+- `top_k`
+- `top_p`
+- `temperature`
+- `repetition_penalty`
+- `min_output_tokens`
+- `noise_scale`
+- `speed`
+
+Success response example:
+
+```json
+{
+  "ok": true,
+  "sample_rate": 32000,
+  "audio_len_s": 2.32,
+  "infer_time_s": 1.48,
+  "mime_type": "audio/wav",
+  "wav_base64": "UklGRi4..."
+}
+```
+
+Note: on inference failure, the server may return fallback audio with HTTP `200` and `ok: true`, plus `degraded: true` and `error`.
+
 ## Flash Attn
-如果你追求**更低的延迟**和**更高的吞吐量**，强烈建议开启 `Flash Attention` 支持。
-由于该库对编译环境有特定要求，请根据你的系统手动安装：
+If you are looking for **lower latency** and **higher throughput**, it is highly recommended to enable `Flash Attention` support.
+Since this library has specific compilation requirements, please install it manually based on your system:
 
-*   **🐧 Linux / 源码构建**
-    *   官方仓库：[Dao-AILab/flash-attention](https://github.com/Dao-AILab/flash-attention)
+*   **🐧 Linux / Build from Source**
+    *   Official Repo: [Dao-AILab/flash-attention](https://github.com/Dao-AILab/flash-attention)
 
-*   **🪟 Windows 用户**
-    *   预编译 Wheel 包：[lldacing/flash-attention-windows-wheel](https://huggingface.co/lldacing/flash-attention-windows-wheel/tree/main)
+*   **🪟 Windows Users**
+    *   Pre-compiled Wheels: [lldacing/flash-attention-windows-wheel](https://huggingface.co/lldacing/flash-attention-windows-wheel/tree/main)
 
 > [!TIP]
-> 安装完成后，在TTS配置中设置 `use_flash_attn=True` 即可享受加速效果！🚀
+> After installation, set `use_flash_attn=True` in your TTS configuration to enjoy the acceleration! 🚀
 
-## 致谢 (Credits)
-特别感谢以下项目：
+## Credits
+Special thanks to the following projects:
 - [RVC-Boss/GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)
 
 ## ⭐ Star History
